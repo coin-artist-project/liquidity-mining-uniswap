@@ -1,0 +1,26 @@
+{
+  "name": "liquidity-mining-uniswap",
+  "version": "1.0.0",
+  "description": "Coin Artist Liquidity Mining Contracts, allowing Liquidity Providers on Uniswap to stake their tokens and receive $COIN and other rewards in return.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coin-artist-project/liquidity-mining-uniswap.git"
+  },
+  "author": "Blockade Games, Inc",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/coin-artist-project/liquidity-mining-uniswap/issues"
+  },
+  "homepage": "https://github.com/coin-artist-project/liquidity-mining-uniswap#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.2.0",
+    "truffle-hdwallet-provider": "^1.0.17"
+  }
+}
