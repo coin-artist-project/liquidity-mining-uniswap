@@ -175,24 +175,21 @@ contract('C.A.L.M. Protocol Tests', async (accounts) => {
   it('User 1 should be able to add to their stake and see amount increase each block as expected', async () => {
     let reward, nextReward;
 
-    // Get the current claim amount
-    reward = await calmProtocol.getClaimAmount(user1);
-
     // Stake the remainder
     await calmProtocol.stake(etherToWei(5), {from:user1});
 
     // Make sure the current claim amount is incremented by the full amount of stake now
     nextReward = await calmProtocol.getClaimAmount(user1);
-    assert(equal(reward.add(toBN(finneyToWei(5))), nextReward));
+    assert(equal(toBN(finneyToWei(0)), nextReward));
 
     //// Now make sure that claim amount is increasing as expected
     await time.advanceBlock();
     nextReward = await calmProtocol.getClaimAmount(user1);
-    assert(equal(reward.add(toBN(finneyToWei(15))), nextReward));
+    assert(equal(toBN(finneyToWei(10)), nextReward));
 
     await time.advanceBlock();
     nextReward = await calmProtocol.getClaimAmount(user1);
-    assert(equal(reward.add(toBN(finneyToWei(25))), nextReward));
+    assert(equal(toBN(finneyToWei(20)), nextReward));
   });
 
   it('All users should have the expected amounts staked at this time', async () => {
