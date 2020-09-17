@@ -10,11 +10,11 @@ module.exports = async function(deployer, network, accounts) {
     console.log(`On non-mainnet network ${network}, deploying test contracts.`);
 
     // Deploy test $COIN with full supply to owner
-    await deployer.deploy(TestERC20Token, "coin_artist_test", "$COINTEST", 3470000);
+    await deployer.deploy(TestERC20Token, "coin_artist_test", "$COINTEST", web3.utils.toWei("3470000", "ether"));
     coinAddress = (await TestERC20Token.deployed()).address;
 
     // Deploy test $UNI-V2 with initial amount to owner
-    await deployer.deploy(TestERC20Token, "UNI-V2", "$UNI-V2-COINTEST", 10);
+    await deployer.deploy(TestERC20Token, "UNI-V2", "$UNI-V2-COINTEST", web3.utils.toWei("10000", "ether"));
     uniswapTokenAddress = (await TestERC20Token.deployed()).address;
   }
   else

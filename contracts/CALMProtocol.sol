@@ -2,10 +2,11 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract CALMProtocol {
 	using SafeMath for uint256;
+	using SafeERC20 for IERC20;
 
 	// Tokens used for staking and rewards
 	IERC20 public poolToken;
@@ -21,8 +22,12 @@ contract CALMProtocol {
 	mapping(address => uint256) lastClaimBlock;
 
 	// Rewards
-	//uint256 blockReward = 1 finney; // finney is 1e-3 of one ether (coin)
 	uint256 blockReward = 1 wei; // wei is the smallest atomic unit of any coin
+
+	// Events
+	event Staked(address indexed user, uint256 amount);
+	event Withdrawn(address indexed user, uint256 amount);
+	event RewardPaid(address indexed user, uint256 reward);
 
 	constructor(
 		address _poolAddress,
@@ -40,7 +45,7 @@ contract CALMProtocol {
 		require(poolTokenBalance > 0 && poolTokenBalance >= _amount, "Invalid number of tokens to stake");
 
 		// Transfer ownership of the tokens to this pool
-		poolToken.transferFrom(msg.sender, address(this), _amount);
+		poolToken.safeTransferFrom(msg.sender, address(this), _amount);
 
 		// If this is the first record of staking for this person, set last claim block
 		if (stakeAtBlock[msg.sender].length == 0) {
@@ -49,20 +54,18 @@ contract CALMProtocol {
 
 		// Record how many tokens that were staked & when
 		stakeAtBlock[msg.sender].push(block.number);
-		balanceByBlock[msg.sender][block.number].add(_amount);
+		balanceByBlock[msg.sender][block.number] = balanceByBlock[msg.sender][block.number].add(_amount);
+
+		// Emit staked event
+		emit Staked(msg.sender, _amount);
 	}
 
 	function unstake() external {
 		// Make sure that the sender has stake to unstake
 		require(stakeAtBlock[msg.sender].length > 0, "Not staking");
 
-		// First, send all unclaimed rewards
-		// TO CHANGE: there are requires that could fail sensibly when calling claim direct
-		// but SHOULD NOT FAIL when calling unstake -- it must always be possible to unstake
+		// First, send all unclaimed rewards -- this also resets claim block
 		claim();
-
-		// Reset claim block
-		// This should happen above ^^^
 
 		// For each stake, add up and return
 		uint256 totalPoolBalanceToReturn = 0;
@@ -70,7 +73,7 @@ contract CALMProtocol {
 			// Collect the total amount
 			uint256 blockNumber = stakeAtBlock[msg.sender][idx];
 			uint256 poolAmount = balanceByBlock[msg.sender][blockNumber];
-			totalPoolBalanceToReturn.add(poolAmount);
+			totalPoolBalanceToReturn = totalPoolBalanceToReturn.add(poolAmount);
 
 			// Wipe out the balance record
 			balanceByBlock[msg.sender][blockNumber] = 0;
@@ -80,25 +83,30 @@ contract CALMProtocol {
 		delete stakeAtBlock[msg.sender];
 
 		// Transfer ownership of the pool tokens back to the owner
-		poolToken.transfer(msg.sender, totalPoolBalanceToReturn);
+		if (totalPoolBalanceToReturn > 0) {
+			poolToken.safeTransfer(msg.sender, totalPoolBalanceToReturn);
+
+			// Emit unstaked event
+			emit Withdrawn(msg.sender, totalPoolBalanceToReturn);
+		}
 	}
 
 	function claim() public {
 		// Make sure that this claimant has tokens to claim
 		uint256 claimBalance = getClaimAmount(msg.sender);
-		require(claimBalance > 0, "No tokens to claim");
+		if (claimBalance > 0) {
+			// Set the most recent time they claimed
+			lastClaimBlock[msg.sender] = block.number;
 
-		// Require we have enough tokens available for them to claim
-		require(claimBalance <= coinToken.balanceOf(address(this)), "Not enough tokens available to claim");
+			// Transfer the tokens to the claimant
+			coinToken.safeTransfer(msg.sender, claimBalance);
 
-		// Set the most recent time they claimed
-		lastClaimBlock[msg.sender] = block.number;
-
-		// Transfer the tokens to the claimant
-		coinToken.transfer(msg.sender, claimBalance);
+			// Emit event
+			emit RewardPaid(msg.sender, claimBalance);
+		}
 	}
 
-	/**
+	/**`
 	 * Note: can generalize this by returning and recording POINTS,
 	 * which can be leveraged through contract derivations to allow for claiming
 	 * arbitrary rewards, such as other FTs or NFTs
@@ -109,7 +117,6 @@ contract CALMProtocol {
 		// in order to determine a proper reward
 		// May also want to take into account the full pool staked here (unlikely)
 		// or the amount that remains (also unlikely, beyond require checks)
-
 		uint256 reward = 0;
 
 		// For each block held, get amount staked
@@ -132,9 +139,22 @@ contract CALMProtocol {
 			uint256 thisReward = blocksSinceLastClaim.mul(blockReward).mul(poolAmount.div(1000));
 
 			// Keep track of total reward
-			reward.add(thisReward);
+			reward = reward.add(thisReward);
 		}
 
 		return reward;
+	}
+
+	function getTotalStaked(address _addr) public view returns(uint256) {
+		// For each stake, add up and return
+		uint256 totalPoolBalance = 0;
+		for (uint256 idx = 0; idx < stakeAtBlock[_addr].length; idx++) {
+			// Collect the total amount
+			uint256 blockNumber = stakeAtBlock[_addr][idx];
+			uint256 poolAmount = balanceByBlock[_addr][blockNumber];
+			totalPoolBalance = totalPoolBalance.add(poolAmount);
+		}
+
+		return totalPoolBalance;
 	}
 }
